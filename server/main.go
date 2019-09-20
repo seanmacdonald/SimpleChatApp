@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
+	"log"
 )
 
 var upgrader = websocket.Upgrader{
@@ -17,13 +19,13 @@ var upgrader = websocket.Upgrader{
 func connect(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	fmt.Println("A new connection was made. There are now", runtime.NumGoroutine(), "goroutines running.")
+	log.Println("A new connection was made. There are now", runtime.NumGoroutine(), "goroutines running.")
 
 	//Note that each http handler func starts a new goroutine and we want to limit
 	//this chat application between 2 users: the client and the server.
 	//Futhermore, when a websocket connection is terminated the goroutine will terminate.
 	if runtime.NumGoroutine() > 3 {
-		fmt.Println("Only one connection allowed at a time")
+		log.Println("Only one connection allowed at a time")
 		return
 	}
 
@@ -52,7 +54,6 @@ func message(conn *websocket.Conn) {
 		case incomingMsg := <-read_chan:
 			fmt.Println(incomingMsg)
 		case outgoingMsg := <-input_chan:
-			fmt.Println("Send this: ", outgoingMsg)
 			if err := conn.WriteMessage(1, []byte(outgoingMsg)); err != nil {
 				fmt.Println(err)
 				return
@@ -67,8 +68,7 @@ func input(c chan string) {
 
 	for {
 		text, _ := reader.ReadString('\n')
-		fmt.Println("in: ", text)
-		c <- text
+		c <- strings.TrimSpace(text)
 	}
 }
 
@@ -76,11 +76,12 @@ func readMessage(c chan string, conn *websocket.Conn) {
 	for {
 		msgType, p, err := conn.ReadMessage()
 		if err != nil {
-			fmt.Println(err)
+			log.Println("Connection to client is over...")
+			log.Println(err)
 			return
 		} else {
 			if msgType == 1 {
-				c <- string(p)
+				c <- "Client: " + string(p)
 			}
 		}
 	}
