@@ -35,7 +35,7 @@ func connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//call read/write loop
+	//start communicating between server and client 
 	message(conn)
 }
 
@@ -43,19 +43,29 @@ func message(conn *websocket.Conn) {
 
 	read_chan := make(chan string)
 	input_chan := make(chan string)
-	defer close(read_chan)
-	defer close(input_chan)
+	close_input := make(chan int)
+	defer close(close_input)
 
-	go input(input_chan)
+	go input(input_chan, close_input)
 	go readMessage(read_chan, conn)
 
 	for {
 		select {
-		case incomingMsg := <-read_chan:
+		case incomingMsg, ok := <-read_chan:
+			if !ok {
+				return 
+			}
 			fmt.Println(incomingMsg)
-		case outgoingMsg := <-input_chan:
+		case outgoingMsg, ok := <-input_chan:
+			if !ok {
+				return 
+			}
 			if err := conn.WriteMessage(1, []byte(outgoingMsg)); err != nil {
 				fmt.Println(err)
+				return
+			}
+			if outgoingMsg == "bye" {
+				conn.Close()
 				return
 			}
 
@@ -63,25 +73,35 @@ func message(conn *websocket.Conn) {
 	}
 }
 
-func input(c chan string) {
+//TODO: make this exit with the connection function 
+func input(input chan string, close_in chan int) {
+	defer close(input)
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
 		text, _ := reader.ReadString('\n')
-		c <- strings.TrimSpace(text)
+		text =  strings.TrimSpace(text)
+		if text == "bye" {
+			input <- text
+			return 
+		}
+		input <- text
 	}
 }
 
-func readMessage(c chan string, conn *websocket.Conn) {
+func readMessage(read chan string, conn *websocket.Conn) {
+	defer close(read)
+
 	for {
 		msgType, p, err := conn.ReadMessage()
 		if err != nil {
-			log.Println("Connection to client is over...")
+			log.Println("Connection to client is over...", runtime.NumGoroutine())
 			log.Println(err)
 			return
 		} else {
 			if msgType == 1 {
-				c <- "Client: " + string(p)
+				read <- "Client: " + string(p)
 			}
 		}
 	}
