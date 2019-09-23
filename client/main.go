@@ -17,9 +17,33 @@ func connect(u url.URL) {
 	defer c.Close()
 	
 
-	for{
-		//TODO: handle messages back and forth 
+	message(c) 
+}
+
+func message(c *websocket.Conn) {
+	read_chan := make(chan string)
+
+	go readMessage(read_chan, c)
+
+	for {
+		select {
+		case incomingMsg := <-read_chan:
+			fmt.Println(incomingMsg)
+		}
 	}
+}
+
+func readMessage(read chan string, c *websocket.Conn) {
+	defer close(read)
+
+	for{
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println(err)
+		}
+		read <- string(message)
+	}
+	
 }
 
 func main() {
