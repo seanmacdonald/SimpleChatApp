@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
-	"log"
 )
 
 var upgrader = websocket.Upgrader{
@@ -24,7 +24,7 @@ func connect(w http.ResponseWriter, r *http.Request) {
 	//Note that each http handler func starts a new goroutine and we want to limit
 	//this chat application between 2 users: the client and the server.
 	//Futhermore, when a websocket connection is terminated the goroutine will terminate.
-	if runtime.NumGoroutine() > 3 {
+	if runtime.NumGoroutine() > 4 {
 		log.Println("Only one connection allowed at a time")
 		return
 	}
@@ -35,7 +35,7 @@ func connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//start communicating between server and client 
+	//start communicating between server and client
 	message(conn)
 }
 
@@ -53,12 +53,12 @@ func message(conn *websocket.Conn) {
 		select {
 		case incomingMsg, ok := <-read_chan:
 			if !ok {
-				return 
+				return
 			}
 			fmt.Println(incomingMsg)
 		case outgoingMsg, ok := <-input_chan:
 			if !ok {
-				return 
+				return
 			}
 			if err := conn.WriteMessage(1, []byte(outgoingMsg)); err != nil {
 				fmt.Println(err)
@@ -73,7 +73,7 @@ func message(conn *websocket.Conn) {
 	}
 }
 
-//TODO: make this exit with the connection function 
+//TODO: make this exit with the connection function
 func input(input chan string, close_in chan int) {
 	defer close(input)
 
@@ -81,10 +81,10 @@ func input(input chan string, close_in chan int) {
 
 	for {
 		text, _ := reader.ReadString('\n')
-		text =  strings.TrimSpace(text)
+		text = strings.TrimSpace(text)
 		if text == "bye" {
 			input <- text
-			return 
+			return
 		}
 		input <- text
 	}
